@@ -41,7 +41,7 @@ class CovidStatsCountrySerializer(serializers.ModelSerializer):
     region_id = serializers.PrimaryKeyRelatedField(
         many=False, read_only=True)
     country = serializers.CharField(read_only=True)
-    region = serializers.CharField()
+    region = serializers.CharField(read_only=True)
 
     class Meta:
         model = CovidStats

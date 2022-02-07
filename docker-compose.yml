@@ -4,14 +4,20 @@ services:
   db:
     image: postgres
     volumes:
-      - ./data/db:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+      - ./init_db.sh:/docker-entrypoint-initdb.d/init_db.sh
     environment:
       - POSTGRES_NAME=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:3001
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py shell < import_data.py &&
+             python manage.py runserver 0.0.0.0:3001
+            "
     volumes:
       - .:/code
     ports:
@@ -22,3 +28,5 @@ services:
       - POSTGRES_PASSWORD=postgres
     depends_on:
       - db
+volumes:
+  pgdata:

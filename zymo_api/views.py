@@ -5,10 +5,15 @@ from rest_framework.response import Response
 from zymo_api.models import CovidStats, Country, Region
 from .serializers import CovidStatsSerializer, CovidStatsCountrySerializer
 
-def get_country(country_id):
+
+def get_country(country_id=None, country_name=None):
     try:
-        return Country.objects.get(
-            pk=country_id)
+        if country_id:
+            return Country.objects.get(
+                pk=country_id)
+        else:
+            return Country.objects.get(
+                name=country_name)
     except CovidStats.DoesNotExist:
         raise Http404
 
@@ -18,6 +23,7 @@ def get_region(region_name):
             name=region_name)
     except CovidStats.DoesNotExist:
         raise Http404
+
 
 class CovidStatsList(generics.ListAPIView):
     """Gets all data for all countries
@@ -52,21 +58,29 @@ class CovidStatsPost(generics.CreateAPIView):
         # remove country from the data
         country_name = data.pop('country', None)
         # find the Country object
-        country = Country.objects.get(name=country_name)
+        country = get_country(country_name=country_name)
         data['country'] = country
 
         # remove region from data
         region = None
         region_name = data.pop('region', None)
+        region_id = None
         if region_name:
             # find the region object
-            region = Region.objects.get(name=region_name)
+            region = get_region(region_name)
         data['region'] = region
 
-        new_covid_stats = CovidStats.objects.create(**data)
-        new_covid_stats.save()
+        existing_rec = CovidStats.objects.filter(
+            country__id=country.id,
+            region__id=region_id
+        )
 
-        return new_covid_stats
+        if not existing_rec:
+            new_covid_stats = CovidStats.objects.create(**data)
+            new_covid_stats.save()
+            return new_covid_stats
+        else:
+            return None
 
     def create(self, request, *args,**kwargs):
         data = request.data
@@ -78,8 +92,15 @@ class CovidStatsPost(generics.CreateAPIView):
             for item in data:
                 new_covidstas = self.create_covidstas(item)
 
+        if not new_covidstas:
+            return Response(
+                data={'message': 'Covid Stats already exist!'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         serializer = CovidStatsSerializer(new_covidstas)
         return Response(serializer.data)
+
 
 
 class CovidStatsCountry(
@@ -124,19 +145,31 @@ class CovidStatsCountry(
 
         # remove region from the comment data
         region = None
+        region_id = None
         region_name = data.pop('region', None)
 
         if region_name:
             # find the region object
             region = get_region(region_name)
+            region_id = region.id
 
         data['region'] = region
 
-        new_covid_stats = CovidStats.objects.create(**data)
-        new_covid_stats.save()
+        # checking uniqe country region constraint
+        existing_rec = CovidStats.objects.filter(
+            country__id=country_id,
+            region__id=region_id
+        )
 
-        serializer = CovidStatsSerializer(new_covid_stats)
-        return Response(serializer.data)
+        if not existing_rec:
+            new_covid_stats = CovidStats.objects.create(**data)
+            new_covid_stats.save()
+            serializer = CovidStatsCountrySerializer(new_covid_stats)
+            return Response(serializer.data)
+        else:
+            return Response(
+                data={'message': 'Covid Stats already exist!'},
+                status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
 
@@ -145,31 +178,45 @@ class CovidStatsCountry(
 
         # remove region from data
         region = None
-        region_name = data.pop('region', None)
+        region_name = data.get('region', None)
         if region_name:
             # find the region object
-            region = Region.objects.get(name=region_name)
+            region = get_region(region_name)
+            data['region'] = region
+
+        else:
+            data['region'] = None
+        exist_record = None
         if region:
             exist_record = CovidStats.objects.filter(
                 country__id=country_id,
                 region__id=region.id
-            )[:1]
+            )
+
         else:
             exist_record = CovidStats.objects.filter(
                 country__id=country_id,
                 region__id__isnull=True
-            )[:1]
+            )
 
-        exist_record.update(**data)
-        serializer = CovidStatsCountrySerializer(exist_record)
+        if exist_record:
+            exist_record.update(**data)
+            updated_record = self.get_object()
 
-        return Response(serializer.data)
+            serializer = CovidStatsCountrySerializer(updated_record)
+            return Response(serializer.data)
+
+        else:
+            Response(
+                data={'message': 'Covid Stats does not exist!'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     def delete(self, request, *args, **kwargs):
         # find the Country object
         covidstats = self.get_object()
         covidstats.delete()
-        return Response(status=status.HTTP_200_OK)
+        return Response(data={'message': 'Covid Stats is deleted successfully!'}, status=status.HTTP_200_OK)
 
 
 class CovidStatsCountryRegions(
@@ -194,14 +241,16 @@ class CovidStatsCountryRegions(
         """
 
         covidstats = self.get_object()
+        serializer = covidstats
         return covidstats
 
 
 class CovidStatsCountryRegion(
-    generics.ListAPIView):
+    generics.ListAPIView,
+    generics.UpdateAPIView):
     queryset = CovidStats.objects.all()
     model = CovidStats
-    serializer_class = CovidStatsSerializer
+    serializer_class = CovidStatsCountrySerializer
 
     def get_object(self):
         """
@@ -211,7 +260,7 @@ class CovidStatsCountryRegion(
         """
 
         country_id = self.kwargs['countryId']
-        region_id = self.kwargs.get('regionId', False)
+        region_id = self.kwargs['regionId']
         try:
             if not region_id:
                 return CovidStats.objects.filter(
@@ -229,7 +278,36 @@ class CovidStatsCountryRegion(
         covidstats = self.get_object()
         return covidstats
 
+    def update(self, request, *args, **kwargs):
+        data = request.data
+        exist_record = self.get_object()
+
+        if exist_record:
+            exist_record.update(**data)
+
+            updated = CovidStats.objects.get(
+                    country__id=self.kwargs['countryId'],
+                    region__id=self.kwargs['regionId']
+                )
+            serializer = CovidStatsCountrySerializer(updated)
+            return Response(serializer.data)
+
+        else:
+            return Response(
+                data={'message': 'Covid Stats does not exist!'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     def delete(self, request, *args, **kwargs):
         covidstats = self.get_object()
+
+        if not covidstats:
+            return Response(
+                data={'message': 'CovidStats does not exist!'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         covidstats.delete()
-        return Response(status=status.HTTP_200_OK)
+        return Response(
+            data={'message': 'CovidStats is deleted successfully!'},
+            status=status.HTTP_200_OK
+        )
