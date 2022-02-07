@@ -1,7 +1,6 @@
 
 import json
 from datetime import datetime
-from turtle import update
 from zymo_api.models import Country, Region, CovidStats
 
 f = open('data/covid-stats.json')

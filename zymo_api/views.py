@@ -1,6 +1,6 @@
 from django.http import Http404
 from rest_framework import status
-from rest_framework import generics, views
+from rest_framework import generics
 from rest_framework.response import Response
 from zymo_api.models import CovidStats, Country, Region
 from .serializers import CovidStatsSerializer, CovidStatsCountrySerializer
@@ -128,7 +128,7 @@ class CovidStatsCountry(
     generics.RetrieveUpdateDestroyAPIView
     ):
     """
-        View to get, create, post, put, delete data for specific country
+        Api to get, create, post, put, delete data for specific country
     """
 
     queryset = CovidStats.objects.all()
@@ -245,7 +245,7 @@ class CovidStatsCountry(
 class CovidStatsCountryRegions(
     generics.ListAPIView):
     """
-        View to get all regional data within an existing country
+        Api to get all regional data within an existing country
     """
     queryset = CovidStats.objects.all()
     model = CovidStats
@@ -275,7 +275,7 @@ class CovidStatsCountryRegion(
     generics.ListAPIView,
     generics.UpdateAPIView):
     """
-        View to get, create, post, put, delete a specific region
+        Api to get, create, post, put, delete a specific region
         within an existing country
     """
 
