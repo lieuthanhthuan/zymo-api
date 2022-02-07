@@ -7,6 +7,16 @@ from .serializers import CovidStatsSerializer, CovidStatsCountrySerializer
 
 
 def get_country(country_id=None, country_name=None):
+    """
+    Get country by name or by country id
+
+        Parameters:
+            country_id (int): country id
+            country_name (str): Country name
+
+        Returns:
+            Country (Country): a country object
+    """
     try:
         if country_id:
             return Country.objects.get(
@@ -17,10 +27,20 @@ def get_country(country_id=None, country_name=None):
     except CovidStats.DoesNotExist:
         raise Http404
 
-def get_region(region_name):
+def get_region(region_name, country_id):
+    """
+    Get region by name
+
+        Parameters:
+            region_name (str): Country name
+
+        Returns:
+            Country (Country): a country object
+    """
     try:
         return Region.objects.get(
-            name=region_name)
+            name=region_name,
+            country__id=country_id)
     except CovidStats.DoesNotExist:
         raise Http404
 
@@ -67,7 +87,7 @@ class CovidStatsPost(generics.CreateAPIView):
         region_id = None
         if region_name:
             # find the region object
-            region = get_region(region_name)
+            region = get_region(region_name, country.id)
         data['region'] = region
 
         existing_rec = CovidStats.objects.filter(
@@ -107,6 +127,9 @@ class CovidStatsCountry(
     generics.CreateAPIView,
     generics.RetrieveUpdateDestroyAPIView
     ):
+    """
+        View to get, create, post, put, delete data for specific country
+    """
 
     queryset = CovidStats.objects.all()
     model = CovidStats
@@ -150,7 +173,7 @@ class CovidStatsCountry(
 
         if region_name:
             # find the region object
-            region = get_region(region_name)
+            region = get_region(region_name, country_id)
             region_id = region.id
 
         data['region'] = region
@@ -221,6 +244,9 @@ class CovidStatsCountry(
 
 class CovidStatsCountryRegions(
     generics.ListAPIView):
+    """
+        View to get all regional data within an existing country
+    """
     queryset = CovidStats.objects.all()
     model = CovidStats
     serializer_class = CovidStatsSerializer
@@ -248,6 +274,11 @@ class CovidStatsCountryRegions(
 class CovidStatsCountryRegion(
     generics.ListAPIView,
     generics.UpdateAPIView):
+    """
+        View to get, create, post, put, delete a specific region
+        within an existing country
+    """
+
     queryset = CovidStats.objects.all()
     model = CovidStats
     serializer_class = CovidStatsCountrySerializer
