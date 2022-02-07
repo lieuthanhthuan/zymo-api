@@ -27,8 +27,8 @@ from rest_framework_swagger.views import get_swagger_view
 schema_view = get_swagger_view(title='Pastebin API')
 
 urlpatterns = [
-    path(r'', schema_view),
-    path(r'countries/', CovidStatsList.as_view()),
+    path('', schema_view),
+    path('countries/', CovidStatsList.as_view()),
     re_path(r'^countries/search/(?P<country>.+)/$', CovidStatsList.as_view()),
     path('country/', CovidStatsPost.as_view()),
     path('country/<int:countryId>/', CovidStatsCountry.as_view()),
