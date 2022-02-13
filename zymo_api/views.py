@@ -22,8 +22,14 @@ def get_country(country_id=None, country_name=None):
             return Country.objects.get(
                 pk=country_id)
         else:
-            return Country.objects.get(
+            country = Country.objects.filter(
+                name=country_name
+            )
+            if country:
+                return Country.objects.get(
                 name=country_name)
+            if country_name:
+                return Country.objects.create(name=country_name)
     except CovidStats.DoesNotExist:
         raise Http404
 
@@ -38,9 +44,16 @@ def get_region(region_name, country_id):
             Country (Country): a country object
     """
     try:
-        return Region.objects.get(
+        if Region.objects.filter(name=region_name,country__id=country_id):
+            return Region.objects.get(
             name=region_name,
-            country__id=country_id)
+            country__id=country_id
+        )
+        else:
+            return Region.objects.create(
+                name=region_name,
+                country_id=country_id
+            )
     except CovidStats.DoesNotExist:
         raise Http404
 
